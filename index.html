@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bubble Shooter Game</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: url('https://i.postimg.cc/BX9WG96h/bg.jpg') no-repeat center center fixed;
+      background-size: cover;
+      font-family: Arial, sans-serif;
+    }
+    canvas {
+      display: block;
+      margin: auto;
+      background: transparent;
+    }
+    #intro {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      color: white;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 20px 40px;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="400" height="600"></canvas>
+  <div id="intro">Tap to Play</div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const intro = document.getElementById("intro");
+
+    const colors = ["red", "green", "blue", "yellow", "purple", "cyan"];
+    const radius = 15;
+    const rows = 5;
+    const cols = 10;
+    const grid = [];
+    let shooter = null;
+    let arrowAngle = 0;
+    const shootSpeed = 5;
+
+    function createGrid() {
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const x = col * radius * 2 + radius + (row % 2 === 0 ? radius : 0);
+          const y = row * radius * 2 + radius;
+          const color = colors[Math.floor(Math.random() * colors.length)];
+          grid.push({ x, y, color, popped: false });
+        }
+      }
+    }
+
+    function drawGrid() {
+      for (const b of grid) {
+        if (!b.popped) {
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, radius, 0, Math.PI * 2);
+          ctx.fillStyle = b.color;
+          ctx.fill();
+        }
+      }
+    }
+
+    function drawShooter() {
+      if (shooter) {
+        ctx.beginPath();
+        ctx.arc(shooter.x, shooter.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = shooter.color;
+        ctx.fill();
+      }
+    }
+
+    function drawArrow() {
+      const x = canvas.width / 2;
+      const y = canvas.height - 40;
+      const len = 30;
+      const dx = Math.cos(arrowAngle) * len;
+      const dy = Math.sin(arrowAngle) * len;
+
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + dx, y + dy);
+      ctx.stroke();
+    }
+
+    function spawnShooter() {
+      shooter = {
+        x: canvas.width / 2,
+        y: canvas.height - 40,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        vx: 0,
+        vy: 0,
+        shooting: false
+      };
+    }
+
+    function shoot() {
+      if (!shooter.shooting) {
+        shooter.vx = Math.cos(arrowAngle) * shootSpeed;
+        shooter.vy = Math.sin(arrowAngle) * shootSpeed;
+        shooter.shooting = true;
+      }
+    }
+
+    function getConnectedBubbles(target, visited = {}) {
+      const key = target.x + "," + target.y;
+      if (visited[key] || target.popped) return [];
+      visited[key] = true;
+
+      const neighbors = grid.filter(b => !b.popped &&
+        b !== target &&
+        Math.hypot(b.x - target.x, b.y - target.y) < radius * 2.1 &&
+        b.color === target.color
+      );
+
+      let group = [target];
+      for (const n of neighbors) {
+        group = group.concat(getConnectedBubbles(n, visited));
+      }
+      return group;
+    }
+
+    function placeBubbleAndCheckMatch(hit) {
+      const newX = hit.x;
+      const newY = hit.y + radius * 2;
+      const newBubble = { x: newX, y: newY, color: shooter.color, popped: false };
+      grid.push(newBubble);
+
+      const connected = getConnectedBubbles(newBubble);
+      if (connected.length >= 3) {
+        for (const b of connected) b.popped = true;
+        playSound();
+      }
+
+      spawnShooter();
+    }
+
+    function updateShooter() {
+      if (shooter && shooter.shooting) {
+        shooter.x += shooter.vx;
+        shooter.y += shooter.vy;
+
+        if (shooter.x < radius || shooter.x > canvas.width - radius) {
+          shooter.vx *= -1;
+        }
+
+        for (const b of grid) {
+          if (!b.popped) {
+            const dx = shooter.x - b.x;
+            const dy = shooter.y - b.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < radius * 2) {
+              shooter.shooting = false;
+              placeBubbleAndCheckMatch(b);
+              return;
+            }
+          }
+        }
+
+        if (shooter.y < radius) {
+          shooter.shooting = false;
+          const topBubble = { x: shooter.x, y: radius, color: shooter.color, popped: false };
+          grid.push(topBubble);
+          const connected = getConnectedBubbles(topBubble);
+          if (connected.length >= 3) {
+            for (const b of connected) b.popped = true;
+            playSound();
+          }
+          spawnShooter();
+        }
+      }
+    }
+
+    function playSound() {
+      const audio = new Audio("pop.mp3");
+      audio.play();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawGrid();
+      drawArrow();
+      drawShooter();
+    }
+
+    function update() {
+      updateShooter();
+      draw();
+      requestAnimationFrame(update);
+    }
+
+    canvas.addEventListener("mousemove", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      arrowAngle = Math.atan2(my - (canvas.height - 40), mx - canvas.width / 2);
+    });
+
+    canvas.addEventListener("click", shoot);
+    intro.addEventListener("click", () => {
+      intro.style.display = "none";
+      spawnShooter();
+      update();
+    });
+
+    createGrid();
+  </script>
+</body>
+</html>
