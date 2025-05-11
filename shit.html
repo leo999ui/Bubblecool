@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bubble Shooter Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyClHm3YrtgBAsbhcG15LdR8clKJ2MBRhwo",
+      authDomain: "bubbleshoot-48e00.firebaseapp.com",
+      projectId: "bubbleshoot-48e00",
+      storageBucket: "bubbleshoot-48e00.firebasestorage.app",
+      messagingSenderId: "1001701870545",
+      appId: "1:1001701870545:web:314fed5d92c5593e3a6ef0",
+      measurementId: "G-R0T7K7DJVL"
+    };
+    firebase.initializeApp(firebaseConfig);
+  </script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      background: linear-gradient(145deg, #292929, #1c1c1c);
+      height: 100vh;
+      color: white;
+    }
+    #loginWrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+    }
+    #authCard {
+      background: #111;
+      padding: 2rem;
+      border-radius: 16px;
+      box-shadow: 0 0 20px rgba(255, 105, 180, 0.3);
+      text-align: center;
+      width: 90%;
+      max-width: 340px;
+    }
+    #authCard h1 {
+      margin-top: 0;
+      color: hotpink;
+    }
+    input {
+      width: 100%;
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      font-size: 1rem;
+      border-radius: 8px;
+      border: none;
+    }
+    button {
+      width: 100%;
+      padding: 0.75rem;
+      margin-top: 1rem;
+      font-size: 1rem;
+      border-radius: 8px;
+      border: none;
+      background-color: hotpink;
+      color: white;
+      cursor: pointer;
+    }
+    button.outline {
+      background: transparent;
+      border: 2px solid hotpink;
+      margin-top: 0.5rem;
+    }
+    #authMessage {
+      margin-top: 1rem;
+      color: lightgreen;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="loginWrapper">
+    <div id="authCard">
+      <h1>🎯 Bubble Shooter</h1>
+      <h3>Login or Sign Up</h3>
+      <input type="email" id="email" placeholder="Email" />
+      <input type="password" id="password" placeholder="Password" />
+      <button id="loginBtn">Login</button>
+      <button id="signupBtn" class="outline">Sign Up</button>
+      <p id="authMessage"></p>
+    </div>
+  </div>
+
+  <script>
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    const loginBtn = document.getElementById("loginBtn");
+    const signupBtn = document.getElementById("signupBtn");
+
+    loginBtn.onclick = () => {
+      const email = document.getElementById("email").value;
+      const pass = document.getElementById("password").value;
+      auth.signInWithEmailAndPassword(email, pass)
+        .then(user => onAuth(user.user))
+        .catch(err => showMessage(err.message));
+    };
+
+    signupBtn.onclick = () => {
+      const email = document.getElementById("email").value;
+      const pass = document.getElementById("password").value;
+      auth.createUserWithEmailAndPassword(email, pass)
+        .then(user => {
+          db.collection("users").doc(user.user.uid).set({
+            email,
+            created: new Date(),
+            highScore: 0,
+            level: 1,
+            lastScore: 0
+          });
+          onAuth(user.user);
+        })
+        .catch(err => showMessage(err.message));
+    };
+
+    function onAuth(user) {
+      firebase.firestore().collection("users").doc(user.uid).get().then(doc => {
+        const data = doc.data();
+        const high = data?.highScore || 0;
+        const lvl = data?.level || 1;
+        const last = data?.lastScore || 0;
+
+        document.getElementById("authCard").innerHTML = `
+          <h2>Welcome, ${user.email}</h2>
+          <p>🎯 High Score: <strong>${high}</strong></p>
+          <p>📈 Last Score: ${last} | Level: ${lvl}</p>
+          <button onclick=\"location.href='index.html?resume=true'\">▶ Continue</button>
+          <button onclick=\"location.href='index.html?resume=false'\" class=\"outline\">New Game</button>
+        `;
+      });
+    }
+
+    function showMessage(msg) {
+      document.getElementById("authMessage").textContent = msg;
+    }
+  </script>
+</body>
+</html>
